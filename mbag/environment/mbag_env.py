@@ -527,6 +527,9 @@ class MbagEnv(object):
                 player_index, "action", self.global_timestep
             )
 
+        goal_dependent_reward *= self._get_reward(
+            player_index, "goal_reward_scale", self.global_timestep
+        )
         reward = goal_dependent_reward + goal_independent_reward
 
         info = self._get_player_info(

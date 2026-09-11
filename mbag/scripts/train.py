@@ -131,6 +131,8 @@ def sacred_config(_log):  # noqa
     per_player_place_wrong_reward: Optional[List[RewardSchedule]] = None
     own_reward_prop: RewardSchedule = 0
     per_player_own_reward_prop: Optional[List[RewardSchedule]] = None
+    goal_reward_scale: RewardSchedule = 1.0
+    per_player_goal_reward_scale: Optional[List[RewardSchedule]] = None
 
     goal_transforms: List[GoalTransformSpec] = []
     uniform_block_type = False
@@ -246,6 +248,10 @@ def sacred_config(_log):  # noqa
             player_config["rewards"]["own_reward_prop"] = per_player_own_reward_prop[
                 player_index
             ]
+        if per_player_goal_reward_scale is not None:
+            player_config["rewards"]["goal_reward_scale"] = (
+                per_player_goal_reward_scale[player_index]
+            )
         player_configs.append(player_config)
 
     environment_params: MbagConfigDict = {
@@ -268,6 +274,7 @@ def sacred_config(_log):  # noqa
             "place_wrong": place_wrong_reward,
             "get_resources": get_resources_reward,
             "own_reward_prop": own_reward_prop,
+            "goal_reward_scale": goal_reward_scale,
         },
         "abilities": {
             "teleportation": teleportation,

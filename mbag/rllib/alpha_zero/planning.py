@@ -331,6 +331,9 @@ class MbagEnvModel(gym.Env):
                 env.global_timestep,
             ) * float(np.sum(~correct * goal_block_id_dist))
 
+        reward *= env._get_reward(
+            player_index, "goal_reward_scale", env.global_timestep
+        )
         return reward
 
     def get_all_rewards(
@@ -384,6 +387,9 @@ class MbagEnvModel(gym.Env):
 
         # TODO: implement lack of reward for breaking palette blocks
 
+        rewards *= env._get_reward(
+            player_index, "goal_reward_scale", env.global_timestep
+        )
         return rewards
 
 
