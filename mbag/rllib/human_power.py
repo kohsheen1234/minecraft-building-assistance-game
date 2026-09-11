@@ -84,6 +84,8 @@ class PowerEstimator(nn.Module):
         self.device = torch.device(device)
 
         obs_space = _flat_obs_space_with_original(obs_space)
+        original_space = cast(Any, obs_space).original_space
+        self.preprocessor = get_preprocessor(original_space)(original_space)
         if isinstance(action_space, spaces.Discrete):
             num_outputs = int(action_space.n)
         else:
@@ -162,6 +164,20 @@ class PowerEstimator(nn.Module):
         """U_r(s') of eq. (8) for every next observation, with the eps_X shift."""
         x = self.x(next_obs).cpu().numpy() + self.x_epsilon
         return np.asarray(robot_reward(x, self.xi, self.eta), dtype=np.float32)
+
+    def reward_for_obs(self, obs) -> float:
+        """U_r for a single structured MBAG observation (world, inventory, timestep)."""
+        flat = self.preprocessor.transform(obs)
+        return float(self.rewards(flat[None])[0])
+
+    def state_numpy(self) -> Dict[str, np.ndarray]:
+        """State dict as numpy arrays, for shipping inside RLlib policy weights."""
+        return {key: value.cpu().numpy() for key, value in self.state_dict().items()}
+
+    def load_state_numpy(self, state: Dict[str, np.ndarray]) -> None:
+        self.load_state_dict(
+            {key: torch.as_tensor(value) for key, value in state.items()}
+        )
 
     def update(
         self,
