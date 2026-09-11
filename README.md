@@ -6,6 +6,10 @@ MBAG is a multiagent environment that can run on its own within Python. It can a
 
 [See the project website for videos of our Minecraft assistant playing with real people!](https://cassidylaidlaw.github.io/minecraft-building-assistance-game/)
 
+> **Human-power branches:** the `human-power/*` branches replace the assistance-game
+> objective with the long-term human power objective of Heitzig & Potham (2025),
+> arXiv:2508.00159v2. See [`docs/human-power/README.md`](docs/human-power/README.md).
+
 ## Setup
 
 This section describes how to set up your environment for running MBAG.

@@ -94,9 +94,23 @@ class RewardsConfigDict(TypedDict, total=False):
     did not have in their inventory previously.
     """
 
+    goal_reward_scale: RewardSchedule
+    """
+    Multiplier applied to this player's goal-dependent reward (progress towards the
+    goal structure plus the incorrect_action penalty). 1.0 is the standard reward;
+    0.0 removes all goal information from this player's reward, which is required
+    for the human-power assistant objective.
+    """
+
 
 RewardsConfigDictKey = Literal[
-    "noop", "action", "place_wrong", "own_reward_prop", "get_resources"
+    "noop",
+    "action",
+    "incorrect_action",
+    "place_wrong",
+    "own_reward_prop",
+    "get_resources",
+    "goal_reward_scale",
 ]
 
 
@@ -223,6 +237,15 @@ class MbagConfigDict(TypedDict, total=False):
     maximum.
     """
 
+    goal_change_prob: float
+    """
+    Probability at each step that the goal is replaced by a fresh draw from the goal
+    generator. Default 0 (goal fixed for the episode). Nonzero values implement the
+    per-step goal change p_g of Heitzig & Potham (2025); the frozen human models in
+    this repo were trained with fixed goals, so leave this at 0 unless the human model
+    handles goal changes.
+    """
+
     _check_for_overlapping_players: bool
     """
     This should always be set to True except in certain cases where planning needs to
@@ -250,6 +273,7 @@ DEFAULT_CONFIG: MbagConfigDict = {
     "randomize_first_episode_length": False,
     "terminate_on_goal_completion": True,
     "truncate_on_no_progress_timesteps": None,
+    "goal_change_prob": 0.0,
     "_check_for_overlapping_players": True,
     "goal_generator": TransformedGoalGenerator,
     "goal_generator_config": {
@@ -277,6 +301,7 @@ DEFAULT_CONFIG: MbagConfigDict = {
         "place_wrong": 0.0,
         "own_reward_prop": 0.0,
         "get_resources": 0,
+        "goal_reward_scale": 1.0,
     },
     "abilities": {
         "teleportation": True,

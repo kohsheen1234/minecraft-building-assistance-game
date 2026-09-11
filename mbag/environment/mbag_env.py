@@ -126,6 +126,7 @@ class MbagEnv(object):
 
         self.is_first_episode = True
         self.any_step_since_last_reset = True
+        self.goal_was_complete: bool = False
 
         # Initialize reward schedules.
         self._reward_schedules: List[Dict[str, Schedule]] = []
@@ -268,18 +269,7 @@ class MbagEnv(object):
         if not self.config["abilities"]["inf_blocks"]:
             self._copy_palette_from_goal()
 
-        self.initial_goal_similarities: List[float] = []
-        for player_index in range(self.config["num_players"]):
-            self.initial_goal_similarities.append(
-                self._get_goal_similarity(
-                    self.current_blocks[:],
-                    self.goal_blocks[:],
-                    partial_credit=True,
-                    player_index=player_index,
-                ).sum()
-            )
-        width, height, depth = self.config["world_size"]
-        self.max_goal_similarity = width * height * depth
+        self._rebaseline_goal_tracking()
 
         if self.config["malmo"]["use_malmo"]:
             self.malmo_interface.reset(
@@ -300,9 +290,6 @@ class MbagEnv(object):
             for player_index in range(self.config["num_players"])
         ]
 
-        self.maximum_goal_percentages = [info["goal_percentage"] for info in info_list]
-        self.timesteps_with_no_progress = 0
-
         return obs_list, info_list
 
     def step(
@@ -311,6 +298,17 @@ class MbagEnv(object):
         assert (
             len(action_tuples) == self.config["num_players"]
         ), "Wrong number of actions."
+
+        goal_changed = False
+        if (
+            self.config["goal_change_prob"] > 0
+            and random.random() < self.config["goal_change_prob"]
+        ):
+            self.goal_blocks = self._generate_goal()
+            if not self.config["abilities"]["inf_blocks"]:
+                self._copy_palette_from_goal()
+            self._rebaseline_goal_tracking()
+            goal_changed = True
 
         reward: float = 0
         own_rewards: List[float] = [0 for _ in range(self.config["num_players"])]
@@ -345,6 +343,10 @@ class MbagEnv(object):
             own_rewards[player_index] = player_reward
             optional_infos[player_index] = player_info
 
+        goal_complete_now = self.current_blocks == self.goal_blocks
+        goal_just_completed = bool(goal_complete_now and not self.goal_was_complete)
+        self.goal_was_complete = goal_complete_now
+
         infos: List[MbagInfoDict] = []
         for player_index, info in enumerate(optional_infos):
             assert info is not None
@@ -353,6 +355,8 @@ class MbagEnv(object):
                 self.goal_blocks[:],
             ).sum()
             info["goal_percentage"] = self._get_goal_percentage(player_index)
+            info["goal_completed"] = goal_just_completed
+            info["goal_changed"] = goal_changed
             infos.append(info)
 
         if self.config["malmo"]["use_malmo"]:
@@ -527,6 +531,9 @@ class MbagEnv(object):
                 player_index, "action", self.global_timestep
             )
 
+        goal_dependent_reward *= self._get_reward(
+            player_index, "goal_reward_scale", self.global_timestep
+        )
         reward = goal_dependent_reward + goal_independent_reward
 
         info = self._get_player_info(
@@ -920,9 +927,12 @@ class MbagEnv(object):
             partial_credit=True,
             player_index=player_index,
         ).sum()
-        return (similarity - self.initial_goal_similarities[player_index]) / (
+        denominator = (
             self.max_goal_similarity - self.initial_goal_similarities[player_index]
         )
+        if denominator == 0:
+            return 1.0
+        return (similarity - self.initial_goal_similarities[player_index]) / denominator
 
     def _get_player_obs(self, player_index: int) -> MbagObs:
         world_obs = np.zeros(self.world_obs_shape, np.uint8)
@@ -1013,6 +1023,8 @@ class MbagEnv(object):
                 if include_goal_similarity_and_goal_percentage
                 else np.nan
             ),
+            "goal_completed": False,
+            "goal_changed": False,
             "goal_dependent_reward": goal_dependent_reward,
             "goal_independent_reward": goal_independent_reward,
             "own_reward": own_reward,
@@ -1214,6 +1226,27 @@ class MbagEnv(object):
                         f"{malmo_location} from Malmo"
                     )
                     self.player_locations[player_index] = malmo_location
+
+    def _rebaseline_goal_tracking(self) -> None:
+        """Recompute per-player progress baselines after the goal (or world) changed."""
+        self.initial_goal_similarities: List[float] = []
+        for player_index in range(self.config["num_players"]):
+            self.initial_goal_similarities.append(
+                self._get_goal_similarity(
+                    self.current_blocks[:],
+                    self.goal_blocks[:],
+                    partial_credit=True,
+                    player_index=player_index,
+                ).sum()
+            )
+        width, height, depth = self.config["world_size"]
+        self.max_goal_similarity = width * height * depth
+        self.maximum_goal_percentages = [
+            self._get_goal_percentage(player_index)
+            for player_index in range(self.config["num_players"])
+        ]
+        self.timesteps_with_no_progress = 0
+        self.goal_was_complete = self.current_blocks == self.goal_blocks
 
     def _done(self) -> bool:
         done = self.timestep >= self.config["horizon"]
