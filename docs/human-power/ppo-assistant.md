@@ -117,10 +117,53 @@ paper-scale experiment needs the full 1500-step horizon and tens of millions of
 env steps, i.e. the GPU box configuration (`num_workers=8`, `train_batch_size=32704`),
 and is not a CPU job.
 
+### 2026-09-11, CPU smoke config for 200 iterations
+
+Config: `iccea_power_assistant iccea_power_cpu_smoke num_training_iters=200
+power_num_sgd_iter=16` (same 6x6x6 world, `lowest_block` human, horizon 150).
+200 iterations x 2400 env steps in 3.9 hours. Full log and checkpoints at 50, 125,
+200 iterations: `docs/human-power/results/2026-09-11-cpu-smoke-200iter-progress.csv`.
+Reference: the human alone finishes in 28 to 53 steps.
+
+| iter | episode len | goal % | human actions to completion | W_h mean (bits) | W_h min / max | U_r | V^e mean | assistant place / break / noop | policy entropy |
+|-----:|------:|------:|------:|------:|:--|------:|------:|:--|------:|
+| 1 | 104.4 | 0.969 | 106.5 | -1.77 | -1.79 / -1.74 | -3.85 | 0.489 | 56.4 / 5.9 / 42.1 | 4.50 |
+| 25 | 64.1 | 0.980 | 62.3 | -2.30 | -3.55 / -0.35 | -5.90 | 0.400 | 15.8 / 2.5 / 45.9 | 2.21 |
+| 50 | 75.1 | 0.959 | 72.8 | -2.78 | -3.31 / -0.38 | -8.60 | 0.314 | 27.1 / 4.0 / 44.0 | 3.19 |
+| 100 | 52.6 | 0.988 | 51.0 | -3.26 | -4.05 / -0.83 | -12.4 | 0.227 | 6.7 / 0.7 / 45.2 | 1.28 |
+| 150 | 45.0 | 1.000 | 45.0 | -3.33 | -4.18 / -0.15 | -13.5 | 0.208 | 0.2 / 0.0 / 44.8 | 0.17 |
+| 175 | 45.9 | 1.000 | 45.9 | -3.41 | -4.05 / -0.11 | -14.0 | 0.226 | 1.1 / 0.2 / 44.6 | 0.04 |
+| 200 | 67.6 | 0.978 | 66.2 | -3.39 | -3.91 / -0.24 | -14.1 | 0.215 | 21.0 / 2.5 / 44.1 | 2.85 |
+
+What this shows:
+
+- **The estimator now separates states.** The spread of W_h within a batch grew
+  from 0.04 bits at iteration 1 to about 4 bits by iteration 100 (min -4.05, max
+  -0.83), so U_r carries real state information. Mean V^e fell from its sigmoid
+  initialisation (0.49) to about 0.21 as discounting was learned; the mean W_h
+  therefore drifts down over training, which is calibration of the estimate, not a
+  loss of human power.
+- **The assistant converged to non-interference.** By iteration 150 it placed 0.2
+  blocks and broke 0.03 per episode, and the human finished in 45 actions, the same
+  as building alone. In this smoke setting the assistant has no way to raise the
+  human's power: the human has infinite blocks, can teleport, and knows the goal, so
+  the power-maximising action is to stay out of the way. That is the paper's
+  prediction for this situation, and it is what the goal-inference assistant
+  notoriously fails to do early in training.
+- **Late drift.** At iteration 200 placements rose back to 21 and entropy to 2.85.
+  The PPO entropy coefficient schedule ends at iteration ~8 (20,000 env steps) and
+  the reward scale is non-stationary because the estimator keeps changing; both are
+  candidates. Longer runs should use a fixed small entropy coefficient and EMPO's
+  z-space transform to stabilise reward scale.
+- Whether the assistant can *increase* power, not merely avoid decreasing it, needs
+  a setting where it can: finite blocks (it can gather and hand over resources),
+  no teleportation (it can clear paths), or partial-house goals. Those are the
+  paper-scale configs.
+
 ### Next experiments
 
-1. Smoke config for 200+ iterations to see whether V^e leaves its initialisation
-   and W_h starts to separate states; add `power_num_sgd_iter=16`.
+1. Rerun the 200-iteration config with `entropy_coeff_end` held small and a longer
+   `entropy_coeff_horizon`, to check whether the late drift disappears.
 2. Ablate `power_x_epsilon` (0.05 vs 1.0, paper Appendix H.1 discusses eps_X = 1
    with a larger xi) since it sets the reward scale PPO sees.
 3. Compare against `ppo_assistant` (goal-reward baseline) and a noop assistant on
