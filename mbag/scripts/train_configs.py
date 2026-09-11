@@ -523,7 +523,9 @@ def make_named_configs(ex: Experiment):
         load_policies_mapping = {}
         per_player_action_reward = [0, 0]
         num_training_iters = 10
-        train_batch_size = 2000
+        train_batch_size = (
+            2400  # = 4 fragments of num_workers * num_envs_per_worker * 150
+        )
         sgd_minibatch_size = 200
         rollout_fragment_length = 150
         max_seq_len = 150
