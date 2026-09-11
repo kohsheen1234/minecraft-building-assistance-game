@@ -1,4 +1,5 @@
 import copy
+from typing import Any, Dict
 
 import numpy as np
 import pytest
@@ -70,7 +71,7 @@ def _estimator(env, **overrides):
     from mbag.agents.action_distributions import MbagActionDistribution
     from mbag.rllib.human_power import PowerEstimator
 
-    kwargs = dict(
+    kwargs: Dict[str, Any] = dict(
         zeta=2.0,
         xi=1.0,
         eta=1.1,
@@ -144,3 +145,61 @@ def test_power_estimator_state_roundtrip():
     b.load_state_dict(a.state_dict())
     t = torch.as_tensor(obs)
     assert torch.allclose(a.x(t), b.x(t)) and torch.allclose(a.v_e(t), b.v_e(t))
+
+
+@pytest.mark.uses_rllib
+@pytest.mark.slow
+@pytest.mark.timeout(900)
+def test_human_power_ppo_smoke():
+    import tempfile
+
+    from mbag.scripts.train import ex
+
+    result = ex.run(
+        config_updates={
+            "run": "MbagHumanPowerPPO",
+            "log_dir": tempfile.mkdtemp(),
+            "width": 6,
+            "height": 6,
+            "depth": 6,
+            "horizon": 20,
+            "goal_generator": "random",
+            # Same goal-filter settings as tests/test_train.py::default_config; the
+            # default size filters loop forever on tiny random goals.
+            "min_width": 0,
+            "min_height": 0,
+            "min_depth": 0,
+            "extract_largest_cc": True,
+            "extract_largest_cc_connectivity": 6,
+            "area_sample": False,
+            "num_players": 2,
+            "heuristic": "lowest_block",
+            "policies_to_train": ["assistant"],
+            "mask_goal": True,
+            "goal_loss_coeff": 0,
+            "use_extra_features": False,
+            "own_reward_prop": 1,
+            "per_player_goal_reward_scale": [1, 0],
+            "gamma": 0.99,
+            "num_workers": 0,
+            "num_training_iters": 2,
+            "train_batch_size": 200,
+            "sgd_minibatch_size": 50,
+            "rollout_fragment_length": 20,
+            "vf_share_layers": True,
+            "hidden_size": 16,
+            "num_layers": 1,
+            "filter_size": 3,
+            "power_hidden_size": 8,
+            "power_num_layers": 1,
+            "power_minibatch_size": 50,
+            "evaluation_interval": None,
+        }
+    ).result
+    assert result is not None
+    stats = result["info"]["learner"]["assistant"]["learner_stats"]
+    assert stats["power/robot_reward_mean"] < 0
+    assert "power/human_power_bits_mean" in stats
+    assert stats["power/v_e_loss"] >= 0
+    # The assistant's env reward is exactly zero; goal-dependent reward is off.
+    assert result["custom_metrics"]["assistant/goal_dependent_reward_mean"] == 0

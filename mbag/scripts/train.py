@@ -49,6 +49,10 @@ from mbag.rllib.bc import BCConfig, BCTorchPolicy
 from mbag.rllib.callbacks import MbagCallbacks
 from mbag.rllib.data_augmentation import randomly_permute_block_types
 from mbag.rllib.gail import MbagGAILConfig, MbagGAILTorchPolicy
+from mbag.rllib.human_power import (
+    MbagHumanPowerPPOConfig,
+    MbagHumanPowerPPOTorchPolicy,
+)
 from mbag.rllib.os_utils import available_cpu_count
 from mbag.rllib.policies import MbagAgentPolicy
 from mbag.rllib.ppo import MbagPPOConfig, MbagPPOTorchPolicy
@@ -347,6 +351,22 @@ def sacred_config(_log):  # noqa
     use_other_agent_action_predictor = True
     other_agent_action_predictor_loss_coeff = 1.0
     reward_scale = 1.0
+
+    # Human-power (Heitzig & Potham 2025) assistant objective; see
+    # mbag/rllib/human_power.py. Only used when run == "MbagHumanPowerPPO".
+    power_zeta = 2.0
+    power_xi = 1.0
+    power_eta = 1.1
+    power_gamma_h = 0.99
+    power_x_epsilon = 0.05
+    power_lr = 1e-3
+    power_num_sgd_iter = 4
+    power_minibatch_size = 256
+    power_target_update_freq = 1
+    power_assistant_policy_id = "assistant"
+    power_hidden_size = 32
+    power_num_layers = 2
+    power_filter_size = 3
     pretrain = False
     strict_mode = False
     validation_participant_ids: List[int] = []
@@ -601,7 +621,9 @@ def sacred_config(_log):  # noqa
 
     policies: MultiAgentPolicyConfigDict = {}
     policy_class: Union[None, Type[TorchPolicy], Type[TorchPolicyV2]] = None
-    if "PPO" in run:
+    if "HumanPowerPPO" in run:
+        policy_class = MbagHumanPowerPPOTorchPolicy
+    elif "PPO" in run:
         policy_class = MbagPPOTorchPolicy
     elif "AlphaZero" in run:
         policy_class = MbagAlphaZeroPolicy
@@ -764,6 +786,22 @@ def sacred_config(_log):  # noqa
                 anchor_policy_mapping=anchor_policy_mapping,
                 anchor_policy_kl_coeff=anchor_policy_kl_coeff,
                 anchor_policy_reverse_kl=anchor_policy_reverse_kl,
+            )
+        if isinstance(config, MbagHumanPowerPPOConfig):
+            config.training(
+                power_zeta=power_zeta,
+                power_xi=power_xi,
+                power_eta=power_eta,
+                power_gamma_h=power_gamma_h,
+                power_x_epsilon=power_x_epsilon,
+                power_lr=power_lr,
+                power_num_sgd_iter=power_num_sgd_iter,
+                power_minibatch_size=power_minibatch_size,
+                power_target_update_freq=power_target_update_freq,
+                power_assistant_policy_id=power_assistant_policy_id,
+                power_hidden_size=power_hidden_size,
+                power_num_layers=power_num_layers,
+                power_filter_size=power_filter_size,
             )
         if isinstance(config, MbagGAILConfig):
             demonstration_input = None
