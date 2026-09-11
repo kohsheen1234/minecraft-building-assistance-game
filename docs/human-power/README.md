@@ -110,9 +110,13 @@ Solve the gridworld and print the robot's plan:
 
 ## Branches
 
-- `human-power/base` (this branch): foundation.
-- `human-power/ppo-assistant`: Phase 2 learning in MBAG with PPO. See its README.
-- `human-power/mcts-assistant`: U_r inside AlphaZero search. Planned.
+- `human-power/base`: foundation (this document).
+- `human-power/ppo-assistant`: Phase 2 learning in MBAG with PPO
+  (`MbagHumanPowerPPO`, configs `iccea_power_assistant`, `iccea_power_cpu_smoke`).
+  See `docs/human-power/ppo-assistant.md`.
+- `human-power/mcts-assistant`: U_r inside AlphaZero search
+  (`MbagHumanPowerAlphaZero`, configs `iccea_power_alphazero_assistant`,
+  `iccea_power_alphazero_cpu_smoke`). See `docs/human-power/mcts-assistant.md`.
 
 ## Results log
 
