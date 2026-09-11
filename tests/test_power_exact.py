@@ -237,3 +237,40 @@ def test_robot_prefers_action_that_empowers_human():
     assert sol.pi_r[0, 0] > 0.9
     # Soft policy still explores.
     assert sol.pi_r[0, 1] > 0.0
+
+
+def test_robot_epsilon_zero_is_pure_min_and_positive_softens_it():
+    # Same sabotage game as test_human_is_cautious_about_robot.
+    k = 2
+    S, A_r, A_h = k + 1, 2, k
+    next_states = np.zeros((S, A_r, A_h, 1), dtype=int)
+    next_probs = np.ones((S, A_r, A_h, 1), dtype=float)
+    next_states[0, 0, 0, 0] = 1
+    next_states[0, 0, 1, 0] = 2
+    next_states[0, 1, :, 0] = 2
+    for s in range(1, S):
+        next_states[s, :, :, 0] = s
+    goal_sets = np.zeros((k, S), dtype=bool)
+    goal_sets[0, 1] = True
+    goal_sets[1, 2] = True
+    game = TabularGame(
+        num_states=S,
+        num_robot_actions=A_r,
+        human_action_counts=[A_h],
+        next_states=next_states,
+        next_probs=next_probs,
+        robot_action_mask=np.ones((S, A_r), dtype=bool),
+        human_action_masks=[np.ones((S, A_h), dtype=bool)],
+        goal_sets=[goal_sets],
+        terminal=np.array([False, True, True]),
+    )
+    exact = solve_human_prior(
+        game, HumanModelParams(nu=0.0, beta_h=np.inf, gamma_h=0.99)
+    )
+    soft = solve_human_prior(
+        game,
+        HumanModelParams(nu=0.0, beta_h=np.inf, gamma_h=0.99, robot_epsilon=0.1),
+    )
+    np.testing.assert_allclose(exact.q_m[0][0, 0, :], [0.0, 0.0])
+    # (1 - eps) * min + eps * mean = 0.9 * 0 + 0.1 * 0.5 for action 0, goal 0.
+    np.testing.assert_allclose(soft.q_m[0][0, 0, :], [0.05, 0.0])

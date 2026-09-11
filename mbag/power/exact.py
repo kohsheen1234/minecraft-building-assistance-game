@@ -91,6 +91,15 @@ class HumanModelParams:
     gamma_h: float
     default_policy: Optional[List[np.ndarray]] = None  # per human (G_h, S, A_h)
     beliefs_about_others: Optional[List[np.ndarray]] = None  # per human (S, A_h)
+    robot_epsilon: float = 0.0
+    """
+    How the human models the robot inside eq. (1). 0 is the paper's exact
+    min_{a_r} (fully cautious). A value eps > 0 mixes the worst case with a uniform
+    robot action, (1 - eps) * min + eps * mean, which is what the paper's Phase 1
+    learning procedure converges to with its eps-greedy adversarial robot (Table 4
+    of the paper anneals eps_r from 1.0 to 0.01). Needed when a single robot action
+    could block a goal forever, otherwise all human actions tie at value zero.
+    """
 
 
 @dataclass
@@ -146,6 +155,9 @@ def solve_human_prior(
     """Fixed-point iteration of eqs. (1) to (3) for every human and goal."""
     S = game.num_states
     prior = HumanPrior()
+    robot_uniform = game.robot_action_mask / game.robot_action_mask.sum(
+        -1, keepdims=True
+    )
     for h in range(game.num_humans):
         A_h = game.human_action_counts[h]
         goals = game.goal_sets[h]  # (G_h, S)
@@ -174,10 +186,17 @@ def solve_human_prior(
             target_values = u_h + params.gamma_h * v_m * continue_mask  # (G_h, S)
             expected = game.expected_next(target_values)  # (G_h, S, A_r, J)
             # eq. (1): min over robot actions (masked), then E over a_{-h}.
-            expected = np.where(
+            masked = np.where(
                 game.robot_action_mask[None, :, :, None], expected, np.inf
             )
-            worst = expected.min(axis=2)  # (G_h, S, J)
+            worst = masked.min(axis=2)  # (G_h, S, J)
+            if params.robot_epsilon > 0:
+                uniform = np.einsum(
+                    "gsaj,sa->gsj", expected, robot_uniform
+                )  # (G_h, S, J)
+                worst = (
+                    1 - params.robot_epsilon
+                ) * worst + params.robot_epsilon * uniform
             q_new = np.einsum("gsj,sja->gsa", worst, others_weight)
             # eq. (2)
             pi_new = params.nu * pi0 + (1 - params.nu) * _masked_softmax(
