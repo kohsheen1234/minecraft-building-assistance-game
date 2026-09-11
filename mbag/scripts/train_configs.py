@@ -659,8 +659,10 @@ def make_named_configs(ex: Experiment):
         rollout_fragment_length = 150
         sample_batch_size = 1200
         sample_freq = 1
-        train_batch_size = 16
-        replay_buffer_size = 6000
+        # The sequence replay buffer needs a recurrent model (max_seq_len > 0); with
+        # interleave_lstm_every = -1 train directly on each fresh sample batch.
+        use_replay_buffer = False
+        train_batch_size = 1
         sgd_minibatch_size = 300
         hidden_channels = 32
         hidden_size = 32
