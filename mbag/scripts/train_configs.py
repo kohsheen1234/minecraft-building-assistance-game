@@ -514,7 +514,9 @@ def make_named_configs(ex: Experiment):
         width = 6
         height = 6
         depth = 6
-        horizon = 50
+        # The lowest_block human alone needs 28-53 steps on these goals; leave room
+        # for an untrained assistant to get in the way and still see completions.
+        horizon = 150
         teleportation = True
         heuristic = "lowest_block"
         checkpoint_to_load_policies = None
@@ -523,8 +525,8 @@ def make_named_configs(ex: Experiment):
         num_training_iters = 10
         train_batch_size = 2000
         sgd_minibatch_size = 200
-        rollout_fragment_length = 50
-        max_seq_len = 50
+        rollout_fragment_length = 150
+        max_seq_len = 150
         num_workers = 2
         num_envs_per_worker = 2
         hidden_size = 32
