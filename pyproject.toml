@@ -44,6 +44,7 @@ packages = [
     "mbag.environment.goals",
     "mbag.environment.malmo",
     "mbag.evaluation",
+    "mbag.power",
     "mbag.rllib",
     "mbag.rllib.alpha_zero",
     "mbag.rllib.models",

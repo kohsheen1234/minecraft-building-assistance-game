@@ -426,6 +426,122 @@ def make_named_configs(ex: Experiment):
         )
 
     @ex.named_config
+    def iccea_power_assistant():
+        """
+        Phase 2 of Heitzig & Potham (2025) in MBAG: a PPO assistant whose only reward
+        is the intrinsic human-power reward U_r(s'). Same env and model as
+        ppo_assistant, goal inference off, goal reward off for the assistant, paper
+        hyperparameters. Set checkpoint_to_load_policies to a human model with policy
+        id "human" (e.g. a BC checkpoint), or combine with iccea_power_cpu_smoke.
+        """
+        run = "MbagHumanPowerPPO"
+        goal_generator = "craftassist"
+        width = 11
+        height = 10
+        depth = 10
+        num_players = 2
+        randomize_first_episode_length = True
+        random_start_locations = True
+        num_training_iters = 100
+        horizon = 1500
+        noop_reward = 0.0
+        get_resources_reward = 0.0
+        teleportation = False
+        inf_blocks = True
+        entropy_coeff_start = 1
+        entropy_coeff_end = 0.01
+        entropy_coeff_horizon = 2_000_000
+        own_reward_prop = 1
+        per_player_goal_reward_scale = [1, 0]
+        per_player_action_reward = [-0.2, 0]
+        goal_loss_coeff = 0
+        gamma = 0.99
+        train_batch_size = 32704
+        num_workers = 8
+        num_envs_per_worker = 8
+        num_gpus = 0
+        lr = 0.0003
+        kl_target = 0.01
+        num_sgd_iter = 3
+        rollout_fragment_length = 511
+        batch_mode = "truncate_episodes"
+        model = "convolutional"
+        filter_size = 5
+        hidden_size = 64
+        hidden_channels = 64
+        max_seq_len = 511
+        sgd_minibatch_size = 512
+        num_layers = 8
+        scale_obs = True
+        vf_share_layers = True
+        vf_loss_coeff = 0.01
+        place_block_loss_coeff_schedule = [[0, 0], [1, 0]]
+        evaluation_num_workers = 0
+        evaluation_interval = None
+        clip_param = 0.2
+        gae_lambda = 0.95
+        custom_action_dist = "mbag_bilevel_categorical"
+        mask_goal = True
+        interleave_lstm_every = -1
+        policies_to_train = ["assistant"]
+        checkpoint_to_load_policies = None
+        checkpoint_name = ""
+        load_policies_mapping = {"human": "human"}
+        power_zeta = 2.0
+        power_xi = 1.0
+        power_eta = 1.1
+        power_gamma_h = 0.99
+        power_x_epsilon = 0.05
+        power_hidden_size = 32
+        power_num_layers = 4
+        power_filter_size = 3
+        experiment_tag = f"iccea_power/{checkpoint_name}"
+
+    @ex.named_config
+    def iccea_power_cpu_smoke():
+        """
+        CPU-sized variant of iccea_power_assistant: small random goals, the
+        goal-following lowest_block heuristic as the human, tiny networks. Use as
+        python -m mbag.scripts.train with iccea_power_assistant iccea_power_cpu_smoke
+        """
+        goal_generator = "random"
+        min_width = 0
+        min_height = 0
+        min_depth = 0
+        extract_largest_cc = True
+        extract_largest_cc_connectivity = 6
+        area_sample = False
+        width = 6
+        height = 6
+        depth = 6
+        # The lowest_block human alone needs 28-53 steps on these goals; leave room
+        # for an untrained assistant to get in the way and still see completions.
+        horizon = 150
+        teleportation = True
+        heuristic = "lowest_block"
+        checkpoint_to_load_policies = None
+        load_policies_mapping = {}
+        per_player_action_reward = [0, 0]
+        num_training_iters = 10
+        train_batch_size = (
+            2400  # = 4 fragments of num_workers * num_envs_per_worker * 150
+        )
+        sgd_minibatch_size = 200
+        rollout_fragment_length = 150
+        max_seq_len = 150
+        num_workers = 2
+        num_envs_per_worker = 2
+        hidden_size = 32
+        hidden_channels = 32
+        num_layers = 2
+        filter_size = 3
+        power_hidden_size = 16
+        power_num_layers = 2
+        power_minibatch_size = 200
+        entropy_coeff_horizon = 20_000
+        experiment_tag = "iccea_power/cpu_smoke"
+
+    @ex.named_config
     def pretrained_assistant():
         run = "BC"
         inf_blocks = True

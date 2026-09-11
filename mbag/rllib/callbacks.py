@@ -150,6 +150,18 @@ class MbagCallbacks(AlphaZeroDefaultCallbacks):
                     f"{policy_id}/num_correct_{action_type_name.lower()}"
                 ] += 1
 
+            if player_index == 0:
+                episode.user_data.setdefault("human_actions", 0)
+                if action.action_type != MbagAction.NOOP:
+                    episode.user_data["human_actions"] += 1
+                if (
+                    info_dict.get("goal_completed", False)
+                    and "human_actions_to_completion" not in episode.user_data
+                ):
+                    episode.user_data["human_actions_to_completion"] = (
+                        episode.user_data["human_actions"]
+                    )
+
             expected_reward: Optional[float] = episode.user_data.get(
                 EXPECTED_REWARDS, {}
             ).get(player_index)
@@ -225,6 +237,9 @@ class MbagCallbacks(AlphaZeroDefaultCallbacks):
         width, height, depth = env.config["world_size"]
         episode.custom_metrics["goal_distance"] = (
             width * height * depth - info_dict["goal_similarity"]
+        )
+        episode.custom_metrics["human_actions_to_completion"] = episode.user_data.get(
+            "human_actions_to_completion", np.nan
         )
 
         horizon_seconds = env.config["horizon"] * env.config["malmo"]["action_delay"]

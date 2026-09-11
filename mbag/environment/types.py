@@ -118,6 +118,15 @@ class MbagInfoDict(TypedDict):
     percentage of the total available goal-dependent reward which has been earned.
     """
 
+    goal_completed: bool
+    """
+    True only on the step in which the current blocks first equal the goal blocks.
+    This is the indicator goal reward U_h(s', g) of the human-power objective.
+    """
+
+    goal_changed: bool
+    """True on steps in which the goal was resampled (see goal_change_prob)."""
+
     own_reward: float
     """
     The reward from this step which is due to the current player's direct actions, i.e.
