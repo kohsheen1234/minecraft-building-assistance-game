@@ -19,11 +19,14 @@ from ray.tune.registry import register_trainable
 
 from .alpha_zero import MbagAlphaZero, MbagAlphaZeroConfig
 from .alpha_zero.alpha_zero_policy import MbagAlphaZeroPolicy
-from .human_power import POWER_GOAL_COMPLETED, POWER_NEXT_OBS, PowerEstimator
+from .human_power import (
+    POWER_ESTIMATOR_WEIGHTS_KEY,
+    POWER_GOAL_COMPLETED,
+    POWER_NEXT_OBS,
+    PowerEstimator,
+)
 
 logger = logging.getLogger(__name__)
-
-POWER_ESTIMATOR_WEIGHTS_KEY = "__power_estimator__"
 
 
 def _power_kwargs(config: Dict[str, Any]) -> Dict[str, Any]:

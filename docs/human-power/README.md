@@ -108,6 +108,48 @@ Solve the gridworld and print the robot's plan:
         print(w.render(s)); print('W_h = %.3f bits' % sol.w_h[0][s]); print()
     "
 
+## Running in Minecraft (Malmo)
+
+Training runs in the Python simulator (Malmo steps at 0.8 s, about 40,000x slower).
+Everything human-facing runs in real Minecraft through Project Malmo: playing with a
+trained human-power assistant, recording episodes, and logging the human's estimated
+power W_h live.
+
+Prerequisites: `pip install -e .[rllib,malmo]` and JDK 1.8.0_152 (on macOS Malmo
+looks for exactly this version via `/usr/libexec/java_home -V`; Azul Zulu 8u152 works
+and needs no Oracle login).
+
+    # Terminal 1: two Minecraft instances, one for the human (sees the goal) and one
+    # for the assistant. Ready when the log shows "CLIENT enter state: DORMANT".
+    TMPDIR=/tmp .venv/bin/python -m malmo.minecraft launch --num_instances 2 --goal_visibility True False
+
+    # Terminal 2: play with a human-power assistant and log W_h per step.
+    TMPDIR=/tmp .venv/bin/python -m mbag.scripts.evaluate with human_with_power_assistant \
+        assistant_run=MbagHumanPowerPPO \
+        assistant_checkpoint=path/to/MbagHumanPowerPPO/.../checkpoint_000200
+
+    # Or the MCTS variant (num_simulations controls planning time per step):
+    TMPDIR=/tmp .venv/bin/python -m mbag.scripts.evaluate with human_with_power_assistant \
+        assistant_run=MbagHumanPowerAlphaZero num_simulations=10 \
+        assistant_checkpoint=path/to/MbagHumanPowerAlphaZero/.../checkpoint_000010
+
+In game: Return enables movement, Fn+Backspace enables flying. The episode ends when
+the house is complete or on Ctrl+C. The run directory then contains the usual episode
+metrics plus `human_power_bits_first/last/mean/min/max/gain` and
+`human_power_trajectories.json` with W_h at every step. `record_video=True` adds a
+spectator instance (launch three) and records video.
+
+The same `log_human_power=True` flag works in the simulator with a heuristic or
+learned human, e.g.
+
+    TMPDIR=/tmp .venv/bin/python -m mbag.scripts.evaluate with \
+        runs='["lowest_block","MbagHumanPowerPPO"]' checkpoints='[None,"path/to/checkpoint"]' \
+        policy_ids='[None,"assistant"]' algorithm_config_updates='[{},{}]' \
+        num_episodes=10 use_malmo=False log_human_power=True out_dir=/tmp/eval
+
+The Malmo tests (`pytest -m uses_malmo`) need the two instances running; the four in
+`tests/test_human.py` wait for a real player and are not for unattended runs.
+
 ## Branches
 
 - `human-power/base`: foundation (this document).

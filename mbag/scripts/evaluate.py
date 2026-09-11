@@ -70,6 +70,11 @@ def sacred_config():
     algorithm_config_updates = [{}]  # type: ignore # noqa: F841
     agent_config_updates = [{}]  # type: ignore # noqa: F841
 
+    # Human-power assistants: log W_h (bits) along each episode using the
+    # PowerEstimator stored in the assistant's checkpoint.
+    log_human_power = False  # noqa: F841
+    power_policy_index = None  # noqa: F841
+
     # Used by named configs
     assistant_checkpoint = None  # noqa: F841
     assistant_run = None  # noqa: F841
@@ -159,6 +164,53 @@ def human_with_assistant():
     }
     min_action_interval = 0.8  # noqa: F841
     use_malmo = True  # noqa: F841
+
+
+@ex.named_config
+def human_with_power_assistant():
+    """
+    Play in Minecraft with a human-power assistant (MbagHumanPowerPPO or
+    MbagHumanPowerAlphaZero checkpoint) and log the human's estimated power W_h.
+    """
+    assistant_checkpoint = None
+    assistant_run = "MbagHumanPowerPPO"
+    num_simulations = 10
+    goal_set = "test"
+    house_id = None
+
+    runs = ["HumanAgent", assistant_run]  # noqa: F841
+    checkpoints = [None, assistant_checkpoint]  # noqa: F841
+    policy_ids = [None, "assistant"]  # noqa: F841
+    num_episodes = 1  # noqa: F841
+    algorithm_config_updates = [  # noqa: F841
+        {},
+        {
+            "num_gpus": 1 if torch.cuda.is_available() else 0,
+            "num_gpus_per_worker": 0,
+            "player_index": 1,
+            "mcts_config": {"num_simulations": num_simulations},
+        },
+    ]
+    env_config_updates = {  # noqa: F841
+        "num_players": 2,
+        "goal_generator_config": {
+            "goal_generator_config": {"subset": goal_set, "house_id": house_id}
+        },
+        "malmo": {"action_delay": 0.8, "rotate_spectator": False},
+        "horizon": 10000,
+        "players": [
+            {
+                "player_name": "human",
+            },
+            {
+                "player_name": "assistant",
+            },
+        ],
+    }
+    min_action_interval = 0.8  # noqa: F841
+    use_malmo = True  # noqa: F841
+    log_human_power = True  # noqa: F841
+    power_policy_index = 1  # noqa: F841
 
 
 @ex.named_config
@@ -539,6 +591,8 @@ def main(  # noqa: C901
     use_malmo: bool,
     num_workers: int,
     save_episodes: bool,
+    log_human_power: bool,
+    power_policy_index: Optional[int],
     observer: FileStorageObserver,
     _log: Logger,
 ):
@@ -548,6 +602,24 @@ def main(  # noqa: C901
 
     out_dir = observer.dir
     assert out_dir is not None
+
+    power_estimator = None
+    if log_human_power:
+        from mbag.rllib.human_power import load_power_estimator
+
+        if power_policy_index is None:
+            candidates = [i for i, run in enumerate(runs) if "HumanPower" in run]
+            if not candidates:
+                raise ValueError(
+                    "log_human_power=True needs a MbagHumanPower* run or an explicit "
+                    "power_policy_index"
+                )
+            power_policy_index = candidates[0]
+        power_checkpoint = checkpoints[power_policy_index]
+        power_policy_id = policy_ids[power_policy_index]
+        assert power_checkpoint is not None and power_policy_id is not None
+        power_estimator = load_power_estimator(power_checkpoint, power_policy_id)
+        _log.info(f"loaded PowerEstimator from {power_checkpoint}")
 
     processes: List[mp.Process] = []
     queues: List[mp.Queue] = []
@@ -610,6 +682,7 @@ def main(  # noqa: C901
 
     episodes: List[MbagEpisode] = []
     episode_metrics: List[MbagEpisodeMetrics] = []
+    power_trajectories: List[List[float]] = []
     with tqdm.trange(num_episodes) as progress_bar:
         for _ in progress_bar:
             episode_or_exception = next(episode_generator)
@@ -619,7 +692,22 @@ def main(  # noqa: C901
                 episode = episode_or_exception
             if save_episodes:
                 episodes.append(episode)
-            episode_metrics.append(calculate_metrics(episode))
+            episode_metric = calculate_metrics(episode)
+            if power_estimator is not None:
+                from mbag.rllib.human_power import human_power_trajectory
+
+                assert power_policy_index is not None
+                bits = human_power_trajectory(
+                    power_estimator, episode.obs_history, power_policy_index
+                )
+                power_trajectories.append(bits.tolist())
+                episode_metric["human_power_bits_first"] = float(bits[0])  # type: ignore[typeddict-unknown-key]
+                episode_metric["human_power_bits_last"] = float(bits[-1])  # type: ignore[typeddict-unknown-key]
+                episode_metric["human_power_bits_mean"] = float(bits.mean())  # type: ignore[typeddict-unknown-key]
+                episode_metric["human_power_bits_min"] = float(bits.min())  # type: ignore[typeddict-unknown-key]
+                episode_metric["human_power_bits_max"] = float(bits.max())  # type: ignore[typeddict-unknown-key]
+                episode_metric["human_power_bits_gain"] = float(bits[-1] - bits[0])  # type: ignore[typeddict-unknown-key]
+            episode_metrics.append(episode_metric)
             mean_goal_percentage = np.mean(
                 [metrics["goal_percentage"] for metrics in episode_metrics]
             )
@@ -634,6 +722,12 @@ def main(  # noqa: C901
     for process in processes:
         process.join(timeout=10)
         process.terminate()
+
+    if power_trajectories:
+        power_fname = os.path.join(out_dir, "human_power_trajectories.json")
+        with open(power_fname, "w") as power_file:
+            json.dump(power_trajectories, power_file)
+        _log.info(f"saved per-step human power (bits) to {power_fname}")
 
     if episodes:
         out_zip_fname = os.path.join(out_dir, "episodes.zip")
