@@ -105,6 +105,7 @@ def sacred_config(_log):  # noqa
     horizon = 1000
     randomize_first_episode_length = True
     truncate_on_no_progress_timesteps: Optional[int] = None
+    goal_change_prob = 0.0
     num_players = 1
     evaluation_num_players = num_players
     width = 11
@@ -259,6 +260,7 @@ def sacred_config(_log):  # noqa
         "horizon": horizon,
         "randomize_first_episode_length": randomize_first_episode_length,
         "truncate_on_no_progress_timesteps": truncate_on_no_progress_timesteps,
+        "goal_change_prob": goal_change_prob,
         "world_size": (width, height, depth),
         "random_start_locations": random_start_locations,
         "goal_generator": TransformedGoalGenerator,

@@ -237,6 +237,15 @@ class MbagConfigDict(TypedDict, total=False):
     maximum.
     """
 
+    goal_change_prob: float
+    """
+    Probability at each step that the goal is replaced by a fresh draw from the goal
+    generator. Default 0 (goal fixed for the episode). Nonzero values implement the
+    per-step goal change p_g of Heitzig & Potham (2025); the frozen human models in
+    this repo were trained with fixed goals, so leave this at 0 unless the human model
+    handles goal changes.
+    """
+
     _check_for_overlapping_players: bool
     """
     This should always be set to True except in certain cases where planning needs to
@@ -264,6 +273,7 @@ DEFAULT_CONFIG: MbagConfigDict = {
     "randomize_first_episode_length": False,
     "terminate_on_goal_completion": True,
     "truncate_on_no_progress_timesteps": None,
+    "goal_change_prob": 0.0,
     "_check_for_overlapping_players": True,
     "goal_generator": TransformedGoalGenerator,
     "goal_generator_config": {
