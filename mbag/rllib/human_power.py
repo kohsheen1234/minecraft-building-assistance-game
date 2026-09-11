@@ -34,6 +34,10 @@ logger = logging.getLogger(__name__)
 
 POWER_GOAL_COMPLETED = "power_goal_completed"
 POWER_NEXT_OBS = "power_next_obs"
+POWER_ESTIMATOR_WEIGHTS_KEY = "__power_estimator__"
+"""Key under which the AlphaZero variant stores the estimator inside policy weights."""
+POWER_ESTIMATOR_STATE_KEY = "power_estimator"
+"""Key under which the PPO variant stores the estimator inside the algorithm state."""
 
 
 def _flat_obs_space_with_original(obs_space: spaces.Space) -> spaces.Space:
@@ -84,6 +88,8 @@ class PowerEstimator(nn.Module):
         self.device = torch.device(device)
 
         obs_space = _flat_obs_space_with_original(obs_space)
+        original_space = cast(Any, obs_space).original_space
+        self.preprocessor = get_preprocessor(original_space)(original_space)
         if isinstance(action_space, spaces.Discrete):
             num_outputs = int(action_space.n)
         else:
@@ -162,6 +168,25 @@ class PowerEstimator(nn.Module):
         """U_r(s') of eq. (8) for every next observation, with the eps_X shift."""
         x = self.x(next_obs).cpu().numpy() + self.x_epsilon
         return np.asarray(robot_reward(x, self.xi, self.eta), dtype=np.float32)
+
+    def reward_for_obs(self, obs) -> float:
+        """U_r for a single structured MBAG observation (world, inventory, timestep)."""
+        flat = self.preprocessor.transform(obs)
+        return float(self.rewards(flat[None])[0])
+
+    def bits_for_obs(self, obs) -> float:
+        """W_h in bits for a single structured MBAG observation."""
+        flat = self.preprocessor.transform(obs)
+        return float(self.power_bits(flat[None])[0])
+
+    def state_numpy(self) -> Dict[str, np.ndarray]:
+        """State dict as numpy arrays, for shipping inside RLlib policy weights."""
+        return {key: value.cpu().numpy() for key, value in self.state_dict().items()}
+
+    def load_state_numpy(self, state: Dict[str, np.ndarray]) -> None:
+        self.load_state_dict(
+            {key: torch.as_tensor(value) for key, value in state.items()}
+        )
 
     def update(
         self,
@@ -581,3 +606,82 @@ class MbagHumanPowerPPO(MbagPPO):
 
 
 register_trainable("MbagHumanPowerPPO", MbagHumanPowerPPO)
+
+
+# --------------------------------------------------------------------------------
+# Loading a trained estimator back from a checkpoint (for evaluation / Malmo runs)
+# --------------------------------------------------------------------------------
+
+
+def load_power_estimator(
+    checkpoint_path: str, policy_id: str = "assistant"
+) -> PowerEstimator:
+    """
+    Rebuild the PowerEstimator saved with a MbagHumanPowerPPO or
+    MbagHumanPowerAlphaZero checkpoint. PPO stores it in the algorithm state, the
+    AlphaZero variant inside the assistant policy's weights.
+    """
+    import os
+    import pickle
+
+    from ray.rllib.algorithms.algorithm import Algorithm
+    from ray.rllib.utils.checkpoints import get_checkpoint_info
+
+    from mbag.agents.action_distributions import MbagActionDistribution
+    from mbag.environment.mbag_env import MbagEnv
+
+    checkpoint_info = get_checkpoint_info(checkpoint_path)
+    state = Algorithm._checkpoint_info_to_algorithm_state(checkpoint_info)
+    config = state["config"]
+    env_config = config["env_config"]
+
+    power_state: Optional[Dict[str, Any]] = state.get(POWER_ESTIMATOR_STATE_KEY)
+    if power_state is None:
+        policy_info = get_checkpoint_info(
+            os.path.join(checkpoint_info["checkpoint_dir"], "policies", policy_id)
+        )
+        with open(policy_info["state_file"], "rb") as f:
+            policy_state = pickle.load(f)
+        power_state = policy_state.get("weights", {}).get(POWER_ESTIMATOR_WEIGHTS_KEY)
+    if power_state is None:
+        raise ValueError(
+            f"{checkpoint_path} does not contain a saved PowerEstimator; was it "
+            "trained with MbagHumanPowerPPO or MbagHumanPowerAlphaZero?"
+        )
+
+    env = MbagEnv(env_config)
+    num_flat_actions = MbagActionDistribution.get_action_mapping(env.config).shape[0]
+    estimator = PowerEstimator(
+        env.observation_space,
+        spaces.Discrete(num_flat_actions),
+        env.config,
+        zeta=config.get("power_zeta", 2.0),
+        xi=config.get("power_xi", 1.0),
+        eta=config.get("power_eta", 1.1),
+        gamma_h=config.get("power_gamma_h", 0.99),
+        x_epsilon=config.get("power_x_epsilon", 0.05),
+        lr=config.get("power_lr", 1e-3),
+        hidden_size=config.get("power_hidden_size", 32),
+        num_layers=config.get("power_num_layers", 2),
+        filter_size=config.get("power_filter_size", 3),
+        target_update_freq=config.get("power_target_update_freq", 1),
+    )
+    estimator.load_state_dict(
+        {key: torch.as_tensor(value) for key, value in power_state.items()}
+    )
+    estimator.eval()
+    return estimator
+
+
+def human_power_trajectory(
+    estimator: PowerEstimator, obs_history, player_index: int
+) -> np.ndarray:
+    """
+    W_h in bits for every observation of ``player_index`` along an episode.
+    ``obs_history`` is ``MbagEpisode.obs_history``: a list (per timestep) of per-player
+    observations.
+    """
+    return np.asarray(
+        [estimator.bits_for_obs(all_obs[player_index]) for all_obs in obs_history],
+        dtype=np.float32,
+    )

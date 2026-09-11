@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import gymnasium as gym
 import numpy as np
@@ -32,8 +32,14 @@ class MbagEnvModelStateDict(MbagStateDict, total=False):
     last_obs_dict: Dict[AgentID, MbagObs]
 
 
-class MbagEnvModelInfoDict(MbagInfoDict):
+class MbagEnvModelInfoDict(MbagInfoDict, total=False):
     other_player_infos: List[MbagInfoDict]
+    power_reward: float
+    """
+    Extra reward added by ``MbagEnvModel.power_reward_fn`` (the human-power intrinsic
+    reward U_r(s') when planning with the human-power objective). Kept in the info so
+    that re-evaluating a node's reward with new goal logits preserves it.
+    """
 
 
 class MbagEnvModel(gym.Env):
@@ -44,6 +50,11 @@ class MbagEnvModel(gym.Env):
 
     action_space: spaces.Discrete
     last_obs_dict: Dict[AgentID, MbagObs]
+    power_reward_fn: Optional[Callable[[MbagObs], float]]
+    """
+    Optional hook mapping the planning agent's next observation to an extra reward
+    that is added to every step's reward (used for the human-power objective).
+    """
 
     def __init__(
         self,
@@ -58,6 +69,7 @@ class MbagEnvModel(gym.Env):
 
         self.env = env
         self.config = config
+        self.power_reward_fn = None
         self.set_player_index(player_index)
         self.line_of_sight_masking = line_of_sight_masking
         self.expected_own_reward_scale = expected_own_reward_scale
@@ -140,6 +152,11 @@ class MbagEnvModel(gym.Env):
         self._store_last_obs_dict(obs_dict)
 
         obs: MbagObs = obs_dict[self.agent_id]
+
+        if self.power_reward_fn is not None:
+            power_reward = float(self.power_reward_fn(obs))
+            info["power_reward"] = power_reward
+            reward += power_reward
 
         return (
             obs,
@@ -257,6 +274,7 @@ class MbagEnvModel(gym.Env):
             info["own_reward_prop"] * info["own_reward"]
             + (1 - info["own_reward_prop"]) * reward
         )
+        reward += info.get("power_reward", 0.0)
 
         return reward
 

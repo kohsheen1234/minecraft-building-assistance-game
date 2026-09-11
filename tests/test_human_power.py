@@ -203,3 +203,33 @@ def test_human_power_ppo_smoke():
     assert stats["power/v_e_loss"] >= 0
     # The assistant's env reward is exactly zero; goal-dependent reward is off.
     assert result["custom_metrics"]["assistant/goal_dependent_reward_mean"] == 0
+
+
+@pytest.mark.uses_rllib
+def test_human_power_trajectory_on_evaluator_episode():
+    from mbag.agents.heuristic_agents import LowestBlockAgent, NoopAgent
+    from mbag.environment.config import MbagConfigDict
+    from mbag.environment.goals.simple import BasicGoalGenerator
+    from mbag.evaluation.evaluator import MbagEvaluator
+    from mbag.rllib.human_power import human_power_trajectory
+
+    config: MbagConfigDict = {
+        "world_size": (5, 5, 5),
+        "num_players": 2,
+        "players": [{}, {}],
+        "horizon": 40,
+        "goal_generator": BasicGoalGenerator,
+        "goal_generator_config": {},
+        "malmo": {"use_malmo": False, "use_spectator": False, "video_dir": None},
+    }
+    episode = MbagEvaluator(config, [(LowestBlockAgent, {}), (NoopAgent, {})]).rollout()
+    from mbag.environment.mbag_env import MbagEnv
+
+    env = MbagEnv(config)
+    est = _estimator(env)
+    bits = human_power_trajectory(est, episode.obs_history, player_index=1)
+    assert bits.shape == (len(episode.obs_history),)
+    assert np.all(np.isfinite(bits))
+    # W_h = log2(X + eps_X) with X > 0, so it is bounded below by log2(eps_X).
+    assert np.all(bits > np.log2(0.05) - 1e-6)
+    assert est.bits_for_obs(episode.obs_history[0][1]) == pytest.approx(bits[0])

@@ -542,6 +542,140 @@ def make_named_configs(ex: Experiment):
         experiment_tag = "iccea_power/cpu_smoke"
 
     @ex.named_config
+    def iccea_power_alphazero_assistant():
+        """
+        Human-power objective (Heitzig & Potham 2025) inside the AlphaZero-style
+        assistant: MCTS node rewards and value targets are U_r(s') from the learned
+        X_h network; no goal predictor, no goal reward for the assistant. Same env
+        and model as assistancezero_assistant. Set checkpoint_to_load_policies to a
+        human model with policy id "human", or combine with
+        iccea_power_alphazero_cpu_smoke.
+        """
+        run = "MbagHumanPowerAlphaZero"
+        goal_generator = "craftassist"
+        width = 11
+        height = 10
+        depth = 10
+        num_players = 2
+        randomize_first_episode_length = True
+        random_start_locations = True
+        horizon = 1500
+        noop_reward = 0
+        get_resources_reward = 0
+        per_player_action_reward = [0, 0]
+        teleportation = False
+        inf_blocks = True
+        own_reward_prop = 1
+        per_player_goal_reward_scale = [1, 0]
+
+        num_training_iters = 2000
+        num_workers = 16
+        num_envs_per_worker = 16
+        max_seq_len = 64
+        rollout_fragment_length = max_seq_len
+        sample_batch_size = 16384
+        sample_freq = 4
+        train_batch_size = 256
+        use_replay_buffer = True
+        use_model_replay_buffer = False
+        replay_buffer_storage_unit = "sequences"
+        replay_buffer_size = 262144
+        num_gpus = 0
+        num_sgd_iter = 1
+        batch_mode = "truncate_episodes"
+        model = "convolutional_alpha_zero"
+        filter_size = 5
+        hidden_channels = 64
+        hidden_size = 64
+        sgd_minibatch_size = 1024
+        num_layers = 8
+        scale_obs = True
+        vf_share_layers = True
+        vf_scale = 1
+        interleave_lstm_every = num_layers // 2
+
+        num_simulations = 100
+        use_bilevel_action_selection = True
+        fix_bilevel_action_selection = True
+        temperature = 1.5
+        dirichlet_noise = 0.25
+        dirichlet_action_subtype_noise_multiplier = 10
+        dirichlet_epsilon = 0.25
+        prior_temperature = 1.0
+        init_q_with_max = False
+        gamma = 0.99
+        lr = 0.001
+        goal_loss_coeff = 0
+        prev_goal_kl_coeff = 0
+        puct_coefficient = 1.0
+        save_freq = 5
+        evaluation_num_workers = 0
+        evaluation_interval = None
+        use_goal_predictor = False
+        use_prev_blocks = False
+        mask_goal = True
+        pretrain = False
+        policies_to_train = ["assistant"]
+        checkpoint_to_load_policies = None
+        checkpoint_name = ""
+        load_policies_mapping = {"human": "human"}
+        power_zeta = 2.0
+        power_xi = 1.0
+        power_eta = 1.1
+        power_gamma_h = 0.99
+        power_x_epsilon = 0.05
+        power_hidden_size = 32
+        power_num_layers = 4
+        power_filter_size = 3
+        experiment_tag = f"iccea_power_alphazero/{checkpoint_name}"
+
+    @ex.named_config
+    def iccea_power_alphazero_cpu_smoke():
+        """
+        CPU-sized variant of iccea_power_alphazero_assistant: small random goals, the
+        lowest_block heuristic as the human, few simulations, tiny networks. Use as
+        python -m mbag.scripts.train with iccea_power_alphazero_assistant \
+            iccea_power_alphazero_cpu_smoke
+        """
+        goal_generator = "random"
+        min_width = 0
+        min_height = 0
+        min_depth = 0
+        extract_largest_cc = True
+        extract_largest_cc_connectivity = 6
+        area_sample = False
+        width = 6
+        height = 6
+        depth = 6
+        horizon = 150
+        teleportation = True
+        heuristic = "lowest_block"
+        checkpoint_to_load_policies = None
+        load_policies_mapping = {}
+        num_training_iters = 10
+        num_workers = 2
+        num_envs_per_worker = 1
+        max_seq_len = 150
+        rollout_fragment_length = 150
+        sample_batch_size = 1200
+        sample_freq = 1
+        # The sequence replay buffer needs a recurrent model (max_seq_len > 0); with
+        # interleave_lstm_every = -1 train directly on each fresh sample batch.
+        use_replay_buffer = False
+        train_batch_size = 1
+        sgd_minibatch_size = 300
+        hidden_channels = 32
+        hidden_size = 32
+        num_layers = 2
+        filter_size = 3
+        interleave_lstm_every = -1
+        num_simulations = 10
+        power_hidden_size = 16
+        power_num_layers = 2
+        power_minibatch_size = 300
+        experiment_tag = "iccea_power_alphazero/cpu_smoke"
+
+    @ex.named_config
     def pretrained_assistant():
         run = "BC"
         inf_blocks = True
