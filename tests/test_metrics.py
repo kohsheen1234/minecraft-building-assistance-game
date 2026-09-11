@@ -144,3 +144,26 @@ def test_metrics():
                 ) or metrics[
                     metric_name  # type: ignore[literal-required]
                 ] == metric_value
+
+
+def test_human_actions_to_completion():
+    from mbag.agents.heuristic_agents import LayerBuilderAgent, NoopAgent
+
+    config: MbagConfigDict = {
+        "world_size": (5, 5, 5),
+        "num_players": 1,
+        "horizon": 60,
+        "goal_generator": BasicGoalGenerator,
+        "goal_generator_config": {},
+        "malmo": {"use_malmo": False, "use_spectator": False, "video_dir": None},
+    }
+    episode = MbagEvaluator(config, [(LayerBuilderAgent, {})]).rollout()
+    metrics = calculate_metrics(episode)
+    # LayerBuilderAgent breaks 9 dirt blocks and places 18 blocks to finish the
+    # basic goal, completing it on its last step, so every step counts.
+    assert metrics["human_actions_to_completion"] == 27
+    assert metrics["human_actions_to_completion"] == episode.length
+
+    episode = MbagEvaluator(config, [(NoopAgent, {})]).rollout()
+    metrics = calculate_metrics(episode)
+    assert np.isnan(metrics["human_actions_to_completion"])

@@ -41,6 +41,11 @@ class MbagEpisodeMetrics(TypedDict):
     goal_distance: float
     goal_percentage: float
     reward: float
+    human_actions_to_completion: float
+    """
+    Number of non-noop actions player 0 took up to and including the step in which
+    the goal was first completed; NaN if the goal was never completed.
+    """
 
 
 def get_rounded_minutes(episode: MbagEpisode, t: int) -> int:
@@ -145,6 +150,21 @@ def calculate_per_player_metrics(
     return player_metrics
 
 
+def human_actions_to_completion(episode: MbagEpisode, player_index: int = 0) -> float:
+    """
+    Number of non-noop actions ``player_index`` took up to and including the step in
+    which the goal was first completed; NaN if it never was.
+    """
+    count = 0
+    for infos in episode.info_history:
+        info = infos[player_index]
+        if info["action"].action_type != MbagAction.NOOP:
+            count += 1
+        if info.get("goal_completed", False):
+            return float(count)
+    return float("nan")
+
+
 def calculate_metrics(episode: MbagEpisode) -> MbagEpisodeMetrics:
     width, height, depth = episode.env_config["world_size"]
 
@@ -161,6 +181,7 @@ def calculate_metrics(episode: MbagEpisode) -> MbagEpisodeMetrics:
         "goal_percentage": episode.last_infos[0].get("goal_percentage", np.nan),
         "player_metrics": players_metrics,
         "reward": sum(episode.reward_history),
+        "human_actions_to_completion": human_actions_to_completion(episode),
     }
 
     cumulative_reward = 0.0
