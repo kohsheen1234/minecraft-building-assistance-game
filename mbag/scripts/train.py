@@ -53,6 +53,10 @@ from mbag.rllib.human_power import (
     MbagHumanPowerPPOConfig,
     MbagHumanPowerPPOTorchPolicy,
 )
+from mbag.rllib.human_power_alpha_zero import (
+    MbagHumanPowerAlphaZeroConfig,
+    MbagHumanPowerAlphaZeroPolicy,
+)
 from mbag.rllib.os_utils import available_cpu_count
 from mbag.rllib.policies import MbagAgentPolicy
 from mbag.rllib.ppo import MbagPPOConfig, MbagPPOTorchPolicy
@@ -353,7 +357,8 @@ def sacred_config(_log):  # noqa
     reward_scale = 1.0
 
     # Human-power (Heitzig & Potham 2025) assistant objective; see
-    # mbag/rllib/human_power.py. Only used when run == "MbagHumanPowerPPO".
+    # mbag/rllib/human_power.py and human_power_alpha_zero.py. Only used when run
+    # is "MbagHumanPowerPPO" or "MbagHumanPowerAlphaZero".
     power_zeta = 2.0
     power_xi = 1.0
     power_eta = 1.1
@@ -625,6 +630,8 @@ def sacred_config(_log):  # noqa
         policy_class = MbagHumanPowerPPOTorchPolicy
     elif "PPO" in run:
         policy_class = MbagPPOTorchPolicy
+    elif "HumanPowerAlphaZero" in run:
+        policy_class = MbagHumanPowerAlphaZeroPolicy
     elif "AlphaZero" in run:
         policy_class = MbagAlphaZeroPolicy
     elif run == "BC":
@@ -913,6 +920,22 @@ def sacred_config(_log):  # noqa
                 }
             )
         )
+        if isinstance(config, MbagHumanPowerAlphaZeroConfig):
+            config.training(
+                power_zeta=power_zeta,
+                power_xi=power_xi,
+                power_eta=power_eta,
+                power_gamma_h=power_gamma_h,
+                power_x_epsilon=power_x_epsilon,
+                power_lr=power_lr,
+                power_num_sgd_iter=power_num_sgd_iter,
+                power_minibatch_size=power_minibatch_size,
+                power_target_update_freq=power_target_update_freq,
+                power_assistant_policy_id=power_assistant_policy_id,
+                power_hidden_size=power_hidden_size,
+                power_num_layers=power_num_layers,
+                power_filter_size=power_filter_size,
+            )
     elif run == "BC":
         assert isinstance(config, BCConfig)
         config.training(
