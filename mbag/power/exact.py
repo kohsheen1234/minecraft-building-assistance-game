@@ -43,14 +43,14 @@ class TabularGame:
     terminal: np.ndarray  # (S,) bool
 
     def __post_init__(self):
-        S, A_r = self.num_states, self.num_robot_actions
-        J = int(np.prod(self.human_action_counts))
+        S, A_r = self.num_states, self.num_robot_actions  # noqa: N806
+        J = int(np.prod(self.human_action_counts))  # noqa: N806
         assert self.next_states.shape[:3] == (S, A_r, J), self.next_states.shape
         assert self.next_probs.shape == self.next_states.shape
         assert self.robot_action_mask.shape == (S, A_r)
         assert len(self.human_action_masks) == self.num_humans
         assert len(self.goal_sets) == self.num_humans
-        for h, A_h in enumerate(self.human_action_counts):
+        for h, A_h in enumerate(self.human_action_counts):  # noqa: N806
             assert self.human_action_masks[h].shape == (S, A_h)
             assert self.goal_sets[h].shape[1] == S
         assert self.terminal.shape == (S,)
@@ -81,7 +81,7 @@ class TabularGame:
         (..., S). Returns shape (S, A_r, J) or (..., S, A_r, J).
         """
         gathered = values[..., self.next_states]  # (..., S, A_r, J, K)
-        return (gathered * self.next_probs).sum(-1)
+        return np.asarray((gathered * self.next_probs).sum(-1))
 
 
 @dataclass
@@ -118,7 +118,7 @@ def _masked_softmax(scores: np.ndarray, beta: float, mask: np.ndarray) -> np.nda
         logits = np.where(mask, beta * scores, -np.inf)
         logits = logits - logits.max(-1, keepdims=True)
         weights = np.exp(logits)
-    return weights / weights.sum(-1, keepdims=True)
+    return np.asarray(weights / weights.sum(-1, keepdims=True))
 
 
 def _joint_policy_of_others(
@@ -130,9 +130,9 @@ def _joint_policy_of_others(
     [s, j, a] = prod_{o != h} pi_o(s, a_o(j)) if a == a_h(j) else 0.
     Used to marginalise over a_{-h} in eq. (1).
     """
-    S = game.num_states
-    J = game.num_joint_human_actions
-    A_h = game.human_action_counts[h]
+    S = game.num_states  # noqa: N806
+    J = game.num_joint_human_actions  # noqa: N806
+    A_h = game.human_action_counts[h]  # noqa: N806
     out = np.zeros((S, J, A_h))
     for j in range(J):
         actions = game.split_joint(j)
@@ -153,19 +153,21 @@ def solve_human_prior(
     tol: float = 1e-10,
 ) -> HumanPrior:
     """Fixed-point iteration of eqs. (1) to (3) for every human and goal."""
-    S = game.num_states
+    S = game.num_states  # noqa: N806
     prior = HumanPrior()
     robot_uniform = game.robot_action_mask / game.robot_action_mask.sum(
         -1, keepdims=True
     )
     for h in range(game.num_humans):
-        A_h = game.human_action_counts[h]
+        A_h = game.human_action_counts[h]  # noqa: N806
         goals = game.goal_sets[h]  # (G_h, S)
-        G_h = goals.shape[0]
+        G_h = goals.shape[0]  # noqa: N806
         mask_h = game.human_action_masks[h]  # (S, A_h)
 
         if params.beliefs_about_others is None:
-            others = [np.ones((S, A_o)) / A_o for A_o in game.human_action_counts]
+            others = [
+                np.ones((S, n_other)) / n_other for n_other in game.human_action_counts
+            ]
         else:
             others = list(params.beliefs_about_others)
         others_weight = _joint_policy_of_others(game, h, others)  # (S, J, A_h)
@@ -252,7 +254,7 @@ class Solution:
 
 def _joint_human_policy(game: TabularGame, per_human: List[np.ndarray]) -> np.ndarray:
     """Product of per-human (S, A_h) policies over joint actions. Returns (S, J)."""
-    S, J = game.num_states, game.num_joint_human_actions
+    S, J = game.num_states, game.num_joint_human_actions  # noqa: N806
     joint = np.ones((S, J))
     for j in range(J):
         for h, a_h in enumerate(game.split_joint(j)):
@@ -277,7 +279,7 @@ def solve_robot(
     Goals of different humans are independent uniform draws (paper Section 2.2,
     "Aggregation across uncertainty"), so E_g factorises over humans.
     """
-    S = game.num_states
+    S = game.num_states  # noqa: N806
     live = ~game.terminal
 
     pi_r = game.robot_action_mask / game.robot_action_mask.sum(-1, keepdims=True)

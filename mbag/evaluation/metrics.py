@@ -210,6 +210,14 @@ def calculate_metrics(episode: MbagEpisode) -> MbagEpisodeMetrics:
     return metrics
 
 
+def _nanmean_or_nan(values: List[float]) -> float:
+    """Mean ignoring NaNs; NaN (without a warning) if every value is NaN or empty."""
+    finite = [value for value in values if not np.isnan(value)]
+    if not finite:
+        return float("nan")
+    return float(np.mean(finite))
+
+
 def calculate_mean_metrics(
     episodes_metrics: List[MbagEpisodeMetrics],
 ) -> MbagEpisodeMetrics:
@@ -253,6 +261,13 @@ def calculate_mean_metrics(
         ),
         "reward": np.mean(
             [episode_metrics["reward"] for episode_metrics in episodes_metrics]
+        ),
+        "human_actions_to_completion": _nanmean_or_nan(
+            [
+                episode_metrics["human_actions_to_completion"]
+                for episode_metrics in episodes_metrics
+                if "human_actions_to_completion" in episode_metrics
+            ]
         ),
         "player_metrics": mean_player_metrics,
     }

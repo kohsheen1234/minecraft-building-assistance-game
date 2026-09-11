@@ -10,9 +10,9 @@ def make_bandit(k: int, outcome_probs: np.ndarray) -> TabularGame:
     outcome_probs[a] is the distribution over outcomes 1..k for human action a. The
     robot has one action and no influence. Goal g_i = {outcome i}.
     """
-    S = k + 1
-    A_r = 1
-    A_h = k
+    S = k + 1  # noqa: N806
+    A_r = 1  # noqa: N806
+    A_h = k  # noqa: N806
     next_states = np.zeros((S, A_r, A_h, k), dtype=int)
     next_probs = np.zeros((S, A_r, A_h, k), dtype=float)
     for a in range(A_h):
@@ -79,7 +79,7 @@ def test_boltzmann_human_mixes_with_default_policy():
 def test_human_is_cautious_about_robot():
     # Robot has two actions; action 1 redirects every human action to outcome 2.
     k = 2
-    S, A_r, A_h = k + 1, 2, k
+    S, A_r, A_h = k + 1, 2, k  # noqa: N806
     next_states = np.zeros((S, A_r, A_h, 1), dtype=int)
     next_probs = np.ones((S, A_r, A_h, 1), dtype=float)
     next_states[0, 0, 0, 0] = 1
@@ -151,7 +151,7 @@ def test_uniform_random_bandit_power_is_minus_log2_k():
         assert sol.w_h[0][0] == pytest.approx(-np.log2(k))
 
 
-def test_rational_bandit_matches_closed_form_W():
+def test_rational_bandit_matches_closed_form_W():  # noqa: N802
     # Appendix A: with G = S and full rationality, W = log2 sum_s max_a P(s|a)^zeta.
     rng = np.random.default_rng(0)
     k = 4
@@ -199,8 +199,8 @@ def test_appendix_a_inequality_holds_on_random_bandits():
 def test_robot_prefers_action_that_empowers_human():
     # Two-step game: robot first chooses "unlock" (state 1) or "keep locked" (state 2).
     # From state 1 the human can reach either of two outcomes; from state 2 only one.
-    S = 5  # 0 root, 1 unlocked, 2 locked, 3 outcome A, 4 outcome B
-    A_r, A_h = 2, 2
+    S = 5  # 0 root, 1 unlocked, 2 locked, 3 outcome A, 4 outcome B  # noqa: N806
+    A_r, A_h = 2, 2  # noqa: N806
     next_states = np.zeros((S, A_r, A_h, 1), dtype=int)
     next_probs = np.ones((S, A_r, A_h, 1))
     next_states[0, 0, :, 0] = 1  # robot action 0 = unlock
@@ -242,7 +242,7 @@ def test_robot_prefers_action_that_empowers_human():
 def test_robot_epsilon_zero_is_pure_min_and_positive_softens_it():
     # Same sabotage game as test_human_is_cautious_about_robot.
     k = 2
-    S, A_r, A_h = k + 1, 2, k
+    S, A_r, A_h = k + 1, 2, k  # noqa: N806
     next_states = np.zeros((S, A_r, A_h, 1), dtype=int)
     next_probs = np.ones((S, A_r, A_h, 1), dtype=float)
     next_states[0, 0, 0, 0] = 1

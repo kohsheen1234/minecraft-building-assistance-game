@@ -129,9 +129,9 @@ class KeyDoorGridworld:
         return self.encode(new_human, new_robot, key_held, door_open)
 
     def _build_game(self) -> TabularGame:
-        S = self.num_cells * self.num_cells * 4
-        A_r = len(self.ROBOT_ACTIONS)
-        A_h = len(self.HUMAN_ACTIONS)
+        S = self.num_cells * self.num_cells * 4  # noqa: N806
+        A_r = len(self.ROBOT_ACTIONS)  # noqa: N806
+        A_h = len(self.HUMAN_ACTIONS)  # noqa: N806
         next_states = np.zeros((S, A_r, A_h, 1), dtype=int)
         next_probs = np.ones((S, A_r, A_h, 1), dtype=float)
         terminal = np.zeros(S, dtype=bool)

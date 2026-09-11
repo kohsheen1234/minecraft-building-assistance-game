@@ -30,9 +30,9 @@ def attainable_goals(
     v_e = np.asarray(v_e, dtype=float)
     powered = v_e**zeta
     if reduce == "sum":
-        return powered.sum(axis=axis)
+        return np.asarray(powered.sum(axis=axis))
     if reduce == "mean":
-        return powered.mean(axis=axis)
+        return np.asarray(powered.mean(axis=axis))
     raise ValueError(f"unknown reduce {reduce!r}; expected 'sum' or 'mean'")
 
 
@@ -83,4 +83,4 @@ def soft_power_policy(
         log_w = np.where(mask, log_w, -np.inf)
         log_w = log_w - log_w.max(axis=-1, keepdims=True)
         weights = np.exp(log_w)
-    return weights / weights.sum(axis=-1, keepdims=True)
+    return np.asarray(weights / weights.sum(axis=-1, keepdims=True))
