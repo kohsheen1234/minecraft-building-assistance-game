@@ -160,6 +160,24 @@ What this shows:
   no teleportation (it can clear paths), or partial-house goals. Those are the
   paper-scale configs.
 
+### 2026-09-11, first episode in real Minecraft through Malmo
+
+The iteration-200 checkpoint above played one episode in two live Minecraft
+instances (Project Malmo, 0.8 s per step) with the `lowest_block` heuristic as the
+human, horizon 100, using `evaluate.py ... use_malmo=True log_human_power=True`.
+All 116 assistant actions executed in-game; per-step W_h is in
+`docs/human-power/results/2026-09-11-malmo-ppo-iter200-power-trajectory.json`.
+
+| steps | goal % at horizon | W_h first | W_h last | W_h gain |
+|---:|---:|---:|---:|---:|
+| 101 | 0.41 | -3.89 | -3.31 | +0.59 bits |
+
+The house was not finished within 100 Malmo steps (the same assistant reaches 98%
+in the simulator over 150 steps), so this run demonstrates the Minecraft pipeline
+and live power logging rather than a behavioural result. The Malmo interface logs
+"received human action for non-human player" warnings when it observes the AI
+players' own movements; they are harmless.
+
 ### Next experiments
 
 1. Rerun the 200-iteration config with `entropy_coeff_end` held small and a longer
