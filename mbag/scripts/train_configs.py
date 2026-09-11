@@ -468,6 +468,7 @@ def make_named_configs(ex: Experiment):
         model = "convolutional"
         filter_size = 5
         hidden_size = 64
+        hidden_channels = 64
         max_seq_len = 511
         sgd_minibatch_size = 512
         num_layers = 8
@@ -527,6 +528,7 @@ def make_named_configs(ex: Experiment):
         num_workers = 2
         num_envs_per_worker = 2
         hidden_size = 32
+        hidden_channels = 32
         num_layers = 2
         filter_size = 3
         power_hidden_size = 16
