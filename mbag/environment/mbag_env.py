@@ -126,6 +126,7 @@ class MbagEnv(object):
 
         self.is_first_episode = True
         self.any_step_since_last_reset = True
+        self.goal_was_complete: bool = False
 
         # Initialize reward schedules.
         self._reward_schedules: List[Dict[str, Schedule]] = []
@@ -302,6 +303,7 @@ class MbagEnv(object):
 
         self.maximum_goal_percentages = [info["goal_percentage"] for info in info_list]
         self.timesteps_with_no_progress = 0
+        self.goal_was_complete = self.current_blocks == self.goal_blocks
 
         return obs_list, info_list
 
@@ -345,6 +347,10 @@ class MbagEnv(object):
             own_rewards[player_index] = player_reward
             optional_infos[player_index] = player_info
 
+        goal_complete_now = self.current_blocks == self.goal_blocks
+        goal_just_completed = bool(goal_complete_now and not self.goal_was_complete)
+        self.goal_was_complete = goal_complete_now
+
         infos: List[MbagInfoDict] = []
         for player_index, info in enumerate(optional_infos):
             assert info is not None
@@ -353,6 +359,7 @@ class MbagEnv(object):
                 self.goal_blocks[:],
             ).sum()
             info["goal_percentage"] = self._get_goal_percentage(player_index)
+            info["goal_completed"] = goal_just_completed
             infos.append(info)
 
         if self.config["malmo"]["use_malmo"]:
@@ -1016,6 +1023,7 @@ class MbagEnv(object):
                 if include_goal_similarity_and_goal_percentage
                 else np.nan
             ),
+            "goal_completed": False,
             "goal_dependent_reward": goal_dependent_reward,
             "goal_independent_reward": goal_independent_reward,
             "own_reward": own_reward,
